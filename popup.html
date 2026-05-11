@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Kinetics</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Kinetics</h1>
+    
+    <div id="day-controls">
+      <button id="start-day-btn">Start Day</button>
+      <button id="end-day-btn" class="hidden">End Day</button>
+    </div>
+
+    <div id="session-controls" class="hidden">
+      <button id="start-session-btn">Start Session</button>
+      <button id="stop-session-btn" class="hidden">Stop Session</button>
+      
+      <div id="active-view" class="hidden">
+        <div class="macro-countdown">
+          <div>Session Time</div>
+          <div id="macro-time">90:00</div>
+        </div>
+        <div class="micro-countdown">
+          <div id="posture-state">Sitting</div>
+          <div id="micro-time">20:00</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="stats-view" class="hidden">
+      <h2>Day Summary</h2>
+      <p>Sessions: <span id="stat-sessions">0</span></p>
+      <p>Sitting: <span id="stat-sit">0</span> mins</p>
+      <p>Standing: <span id="stat-stand">0</span> mins</p>
+      <p>Moving: <span id="stat-move">0</span> mins</p>
+      <button id="reset-day-btn">Reset for Tomorrow</button>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
