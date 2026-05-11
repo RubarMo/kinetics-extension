@@ -35,6 +35,13 @@
 - Modern CSS3 (Inter font, Flexbox, CSS Variables)
 - Chrome Extensions API
 
+## 👨‍💻 Author
+
+**RubarMo**
+- [GitHub: @RubarMo](https://github.com/RubarMo)
+
+If you find this extension helpful for your productivity and posture, feel free to give the repository a ⭐!
+
 ## 📄 License
 
 This project is open-source and available under the [MIT License](LICENSE).
