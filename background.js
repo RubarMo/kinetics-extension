@@ -11,94 +11,117 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+function isValidTab(tab) {
+  return tab && tab.url &&
+    !tab.url.startsWith('chrome://') &&
+    !tab.url.startsWith('edge://') &&
+    !tab.url.startsWith('about:');
+}
+
+async function injectInto(tabId) {
+  try {
+    await chrome.scripting.insertCSS({ target: { tabId }, files: ['content.css'] });
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function tryNotifyTab(tabId, message) {
+  try {
+    await chrome.tabs.sendMessage(tabId, { action: "showNotification", message: message });
+    return true;
+  } catch {
+    // Content script not loaded yet — inject and try again
+    if (await injectInto(tabId)) {
+      try {
+        await chrome.tabs.sendMessage(tabId, { action: "showNotification", message: message });
+        return true;
+      } catch {}
+    }
+    return false;
+  }
+}
+
 async function notifyTab(message) {
   try {
-    const tabs = await chrome.tabs.query({ active: true });
-    for (const tab of tabs) {
-      try {
-        await chrome.tabs.sendMessage(tab.id, { action: "showNotification", message: message });
-        return;
-      } catch {
-        // Content script not loaded in this tab (e.g., chrome:// page), try next
-      }
+    // Try active tabs first (fastest path)
+    const activeTabs = await chrome.tabs.query({ active: true });
+    for (const tab of activeTabs) {
+      if (!isValidTab(tab)) continue;
+      if (await tryNotifyTab(tab.id, message)) return;
     }
 
-    // No active tab received the message — try any open tab
+    // No active tab worked — try all open tabs
     const allTabs = await chrome.tabs.query({});
     for (const tab of allTabs) {
-      try {
-        await chrome.tabs.sendMessage(tab.id, { action: "showNotification", message: message });
-        return;
-      } catch {
-        // Content script not loaded in this tab either
-      }
+      if (!isValidTab(tab)) continue;
+      await chrome.tabs.update(tab.id, { active: true });
+      if (tab.windowId) await chrome.windows.update(tab.windowId, { focused: true });
+      if (await tryNotifyTab(tab.id, message)) return;
     }
 
-    // Last resort: open fallback page
+    // Last resort: open the dedicated fallback page
     chrome.tabs.create({ url: `fallback.html?msg=${encodeURIComponent(message)}` });
   } catch (err) {
-    console.error("Kinetics: Critical failure in notifyTab", err);
+    console.error("Kinetics: notifyTab error", err);
   }
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === 'postureTransition') {
-    const data = await chrome.storage.local.get(['sessionActive', 'currentPosture', 'cycleCount', 'stats', 'settings']);
-    if (!data.sessionActive) {
-      await chrome.alarms.clear('postureTransition');
+  if (alarm.name !== 'postureTransition') return;
+
+  const data = await chrome.storage.local.get(['sessionActive', 'currentPosture', 'cycleCount', 'stats', 'settings']);
+  if (!data.sessionActive) {
+    await chrome.alarms.clear('postureTransition');
+    return;
+  }
+
+  const settings = data.settings || { sitMins: 20, standMins: 8, moveMins: 2, sessionCycles: 3 };
+  let nextPosture = '';
+  let nextDuration = 0;
+  let cycleCount = data.cycleCount || 0;
+  const stats = data.stats || { totalSessions: 0, totalSitMins: 0, totalStandMins: 0, totalMoveMins: 0 };
+  let message = '';
+
+  if (data.currentPosture === 'sitting') {
+    stats.totalSitMins += settings.sitMins;
+    nextPosture = 'standing';
+    nextDuration = settings.standMins;
+    message = "Time to Stand!";
+  } else if (data.currentPosture === 'standing') {
+    stats.totalStandMins += settings.standMins;
+    nextPosture = 'moving';
+    nextDuration = settings.moveMins;
+    message = "Time to Move!";
+  } else if (data.currentPosture === 'moving') {
+    stats.totalMoveMins += settings.moveMins;
+    cycleCount++;
+    if (cycleCount < settings.sessionCycles) {
+      nextPosture = 'sitting';
+      nextDuration = settings.sitMins;
+      message = "Time to Sit!";
+    } else {
+      stats.totalSessions++;
+      await chrome.storage.local.set({
+        sessionActive: false,
+        currentPosture: null,
+        stats: stats
+      });
+      await notifyTab("Session Complete!");
       return;
     }
-
-    const settings = data.settings || { sitMins: 20, standMins: 8, moveMins: 2, sessionCycles: 3 };
-
-    let nextPosture = '';
-    let nextDuration = 0;
-    let cycleCount = data.cycleCount || 0;
-    const stats = data.stats || { totalSessions: 0, totalSitMins: 0, totalStandMins: 0, totalMoveMins: 0 };
-    let message = '';
-
-    if (data.currentPosture === 'sitting') {
-      stats.totalSitMins += settings.sitMins;
-      nextPosture = 'standing';
-      nextDuration = settings.standMins;
-      message = "Time to Stand!";
-    } else if (data.currentPosture === 'standing') {
-      stats.totalStandMins += settings.standMins;
-      nextPosture = 'moving';
-      nextDuration = settings.moveMins;
-      message = "Time to Move!";
-    } else if (data.currentPosture === 'moving') {
-      stats.totalMoveMins += settings.moveMins;
-      cycleCount++;
-      if (cycleCount < settings.sessionCycles) {
-        nextPosture = 'sitting';
-        nextDuration = settings.sitMins;
-        message = "Time to Sit!";
-      } else {
-        // Session complete
-        stats.totalSessions++;
-        await chrome.storage.local.set({
-          sessionActive: false,
-          currentPosture: null,
-          stats: stats
-        });
-        await notifyTab("Session Complete!");
-        return;
-      }
-    }
-
-    console.log(`Kinetics: Transitioning to ${nextPosture} for ${nextDuration} mins. Message: ${message}`);
-
-    await chrome.storage.local.set({
-      currentPosture: nextPosture,
-      postureStartTime: Date.now(),
-      postureDurationMins: nextDuration,
-      cycleCount: cycleCount,
-      stats: stats
-    });
-
-    chrome.alarms.create('postureTransition', { delayInMinutes: nextDuration });
-    console.log("Kinetics: Alarm created, calling notifyTab...");
-    await notifyTab(message);
   }
+
+  await chrome.storage.local.set({
+    currentPosture: nextPosture,
+    postureStartTime: Date.now(),
+    postureDurationMins: nextDuration,
+    cycleCount: cycleCount,
+    stats: stats
+  });
+
+  chrome.alarms.create('postureTransition', { delayInMinutes: nextDuration });
+  await notifyTab(message);
 });

@@ -20,8 +20,8 @@ if (!window.kineticsContentScriptLoaded) {
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "showNotification") {
       showModal(request.message);
-      sendResponse({ success: true });
     }
+    sendResponse({ success: true });
   });
 
   function playChime() {
@@ -29,6 +29,7 @@ if (!window.kineticsContentScriptLoaded) {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (!AudioContext) return;
       const ctx = new AudioContext();
+      if (ctx.state === 'suspended') ctx.resume();
       
       function playTone(freq, startTime, duration) {
         const osc = ctx.createOscillator();
