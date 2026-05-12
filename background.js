@@ -11,56 +11,31 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-async function trySendMessage(tabId, message) {
-  try {
-    await chrome.tabs.sendMessage(tabId, { action: "showNotification", message: message });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function injectAndNotify(tabId, message) {
-  try {
-    await chrome.scripting.insertCSS({ target: { tabId }, files: ['content.css'] });
-    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-    await chrome.tabs.sendMessage(tabId, { action: "showNotification", message: message });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function isValidTab(tab) {
-  return tab && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('about:');
-}
-
 async function notifyTab(message) {
   try {
     const tabs = await chrome.tabs.query({ active: true });
-    let notified = false;
-
     for (const tab of tabs) {
-      if (!isValidTab(tab)) continue;
-      // Try sending message first — content script may already be loaded
-      notified = await trySendMessage(tab.id, message) || await injectAndNotify(tab.id, message);
-      if (notified) break;
-    }
-
-    if (!notified) {
-      const allTabs = await chrome.tabs.query({});
-      for (const tab of allTabs) {
-        if (!isValidTab(tab)) continue;
-        await chrome.tabs.update(tab.id, { active: true });
-        if (tab.windowId) await chrome.windows.update(tab.windowId, { focused: true });
-        notified = await trySendMessage(tab.id, message) || await injectAndNotify(tab.id, message);
-        if (notified) break;
+      try {
+        await chrome.tabs.sendMessage(tab.id, { action: "showNotification", message: message });
+        return;
+      } catch {
+        // Content script not loaded in this tab (e.g., chrome:// page), try next
       }
     }
 
-    if (!notified) {
-      chrome.tabs.create({ url: `fallback.html?msg=${encodeURIComponent(message)}` });
+    // No active tab received the message — try any open tab
+    const allTabs = await chrome.tabs.query({});
+    for (const tab of allTabs) {
+      try {
+        await chrome.tabs.sendMessage(tab.id, { action: "showNotification", message: message });
+        return;
+      } catch {
+        // Content script not loaded in this tab either
+      }
     }
+
+    // Last resort: open fallback page
+    chrome.tabs.create({ url: `fallback.html?msg=${encodeURIComponent(message)}` });
   } catch (err) {
     console.error("Kinetics: Critical failure in notifyTab", err);
   }

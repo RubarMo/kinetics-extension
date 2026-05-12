@@ -7,8 +7,15 @@
   "permissions": [
     "alarms",
     "storage",
-    "scripting",
-    "activeTab"
+    "tabs"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
   ],
   "action": {
     "default_popup": "popup.html",
