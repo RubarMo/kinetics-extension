@@ -23,46 +23,36 @@ async function injectInto(tabId) {
     await chrome.scripting.insertCSS({ target: { tabId }, files: ['content.css'] });
     await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
     return true;
-  } catch {
-    return false;
-  }
-}
-
-async function tryNotifyTab(tabId, message) {
-  try {
-    await chrome.tabs.sendMessage(tabId, { action: "showNotification", message: message });
-    return true;
-  } catch {
-    // Content script not loaded yet — inject and try again
-    if (await injectInto(tabId)) {
-      try {
-        await chrome.tabs.sendMessage(tabId, { action: "showNotification", message: message });
-        return true;
-      } catch {}
-    }
+  } catch (e) {
+    console.error("Kinetics: injectInto failed", e);
     return false;
   }
 }
 
 async function notifyTab(message) {
   try {
-    // Try active tabs first (fastest path)
-    const activeTabs = await chrome.tabs.query({ active: true });
+    // Try active tabs in current window first
+    const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
     for (const tab of activeTabs) {
       if (!isValidTab(tab)) continue;
-      if (await tryNotifyTab(tab.id, message)) return;
+      // Inject scripts fresh every time (proven working approach)
+      if (await injectInto(tab.id)) {
+        chrome.tabs.sendMessage(tab.id, { action: "showNotification", message: message }).catch(() => {});
+        return;
+      }
     }
 
-    // No active tab worked — try all open tabs
-    const allTabs = await chrome.tabs.query({});
+    // Try all windows
+    const allTabs = await chrome.tabs.query({ active: true });
     for (const tab of allTabs) {
       if (!isValidTab(tab)) continue;
-      await chrome.tabs.update(tab.id, { active: true });
-      if (tab.windowId) await chrome.windows.update(tab.windowId, { focused: true });
-      if (await tryNotifyTab(tab.id, message)) return;
+      if (await injectInto(tab.id)) {
+        chrome.tabs.sendMessage(tab.id, { action: "showNotification", message: message }).catch(() => {});
+        return;
+      }
     }
 
-    // Last resort: open the dedicated fallback page
+    // Last resort
     chrome.tabs.create({ url: `fallback.html?msg=${encodeURIComponent(message)}` });
   } catch (err) {
     console.error("Kinetics: notifyTab error", err);

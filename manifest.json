@@ -1,24 +1,17 @@
 {
   "manifest_version": 3,
   "name": "Kinetics",
-  "description": "A strict 90-minute productivity timer that enforces the Cornell 20-8-2 ergonomic posture protocol using in-browser notifications.",
+  "description": "A customizable productivity timer that enforces the Cornell 20-8-2 ergonomic posture protocol with in-browser modal notifications and audible chimes.",
   "version": "2.0.0",
   "author": "RubarMo",
   "permissions": [
     "alarms",
     "storage",
-    "scripting"
+    "scripting",
+    "activeTab"
   ],
   "host_permissions": [
     "*://*/*"
-  ],
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["content.css"],
-      "run_at": "document_idle"
-    }
   ],
   "action": {
     "default_popup": "popup.html",

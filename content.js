@@ -1,4 +1,4 @@
-if (!window.kineticsContentScriptLoaded) {
+if (!window.kineticsContentScriptLoaded && window.top === window.self) {
   window.kineticsContentScriptLoaded = true;
   let keydownListenerAdded = false;
 
@@ -19,7 +19,11 @@ if (!window.kineticsContentScriptLoaded) {
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "showNotification") {
-      showModal(request.message);
+      try {
+        showModal(request.message);
+      } catch (e) {
+        console.error("Kinetics: showModal error", e);
+      }
     }
     sendResponse({ success: true });
   });
