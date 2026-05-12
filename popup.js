@@ -138,7 +138,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     await chrome.alarms.clearAll();
     await chrome.storage.local.set({
       dayActive: false,
-      sessionActive: false
+      sessionActive: false,
+      currentPosture: null,
+      cycleCount: 0,
+      postureStartTime: null,
+      postureDurationMins: null
     });
     updateUI();
   });
@@ -148,6 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const data = await chrome.storage.local.get('settings');
     const settings = data.settings || { sitMins: 20 };
 
+    await chrome.alarms.clear('postureTransition');
     await chrome.storage.local.set({
       sessionActive: true,
       sessionStartTime: now,

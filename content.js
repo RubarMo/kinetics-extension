@@ -1,5 +1,21 @@
 if (!window.kineticsContentScriptLoaded) {
   window.kineticsContentScriptLoaded = true;
+  let keydownListenerAdded = false;
+
+  function dismissOverlay() {
+    const overlay = document.getElementById('kinetics-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('visible');
+    setTimeout(() => {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }, 300);
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Escape' || e.key === 'Enter') {
+      dismissOverlay();
+    }
+  }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "showNotification") {
@@ -71,22 +87,24 @@ if (!window.kineticsContentScriptLoaded) {
     msg.id = 'kinetics-message';
     msg.innerText = message;
 
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) dismissOverlay();
+    });
+
     const btn = document.createElement('button');
     btn.id = 'kinetics-ok-btn';
     btn.innerText = 'OK';
-    btn.onclick = () => {
-      overlay.classList.remove('visible');
-      setTimeout(() => {
-        if (overlay.parentNode) {
-          overlay.parentNode.removeChild(overlay);
-        }
-      }, 300);
-    };
+    btn.onclick = dismissOverlay;
 
     modal.appendChild(title);
     modal.appendChild(msg);
     modal.appendChild(btn);
     overlay.appendChild(modal);
+
+    if (!keydownListenerAdded) {
+      document.addEventListener('keydown', handleKeyDown);
+      keydownListenerAdded = true;
+    }
 
     document.body.appendChild(overlay);
 
