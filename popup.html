@@ -7,7 +7,10 @@
 </head>
 <body>
   <div class="container">
-    <h1>Kinetics</h1>
+    <div id="header-row">
+      <h1>Kinetics</h1>
+      <button id="settings-toggle-btn" title="Settings">⚙️</button>
+    </div>
     
     <div id="day-controls">
       <button id="start-day-btn">Start Day</button>
@@ -37,6 +40,23 @@
       <p>Standing: <span id="stat-stand">0</span> mins</p>
       <p>Moving: <span id="stat-move">0</span> mins</p>
       <button id="reset-day-btn">Reset for Tomorrow</button>
+    </div>
+
+    <div id="settings-view" class="hidden">
+      <h2>Settings</h2>
+      <div class="setting-group">
+        <label>Sit (mins)</label>
+        <input type="number" id="setting-sit" min="0.1" step="0.1" max="120" value="20">
+      </div>
+      <div class="setting-group">
+        <label>Stand (mins)</label>
+        <input type="number" id="setting-stand" min="0.1" step="0.1" max="60" value="8">
+      </div>
+      <div class="setting-group">
+        <label>Move (mins)</label>
+        <input type="number" id="setting-move" min="0.1" step="0.1" max="30" value="2">
+      </div>
+      <button id="save-settings-btn">Save Settings</button>
     </div>
 
     <div class="footer">

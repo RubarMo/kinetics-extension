@@ -8,9 +8,46 @@ if (!window.kineticsContentScriptLoaded) {
     }
   });
 
+  function playChime() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      
+      function playTone(freq, startTime, duration) {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      }
+      
+      // Play a pleasant double-chime (D5 -> A5)
+      playTone(587.33, ctx.currentTime, 0.4);
+      playTone(880.00, ctx.currentTime + 0.15, 0.6);
+    } catch (e) {
+      console.log("Kinetics audio blocked by browser autoplay policy", e);
+    }
+  }
+
   function showModal(message) {
-    if (document.getElementById('kinetics-overlay')) {
-      document.getElementById('kinetics-message').innerText = message;
+    console.log("Kinetics content script: showModal called with message:", message);
+    playChime();
+
+    const existingOverlay = document.getElementById('kinetics-overlay');
+    if (existingOverlay) {
+      console.log("Kinetics content script: updating existing overlay");
+      const msgElement = document.getElementById('kinetics-message');
+      if (msgElement) msgElement.innerText = message;
+      existingOverlay.classList.add('visible');
       return;
     }
 

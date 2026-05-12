@@ -16,8 +16,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     statSit: document.getElementById('stat-sit'),
     statStand: document.getElementById('stat-stand'),
     statMove: document.getElementById('stat-move'),
-    resetDayBtn: document.getElementById('reset-day-btn')
+    resetDayBtn: document.getElementById('reset-day-btn'),
+    settingsToggleBtn: document.getElementById('settings-toggle-btn'),
+    settingsView: document.getElementById('settings-view'),
+    settingSit: document.getElementById('setting-sit'),
+    settingStand: document.getElementById('setting-stand'),
+    settingMove: document.getElementById('setting-move'),
+    saveSettingsBtn: document.getElementById('save-settings-btn')
   };
+
+  // Load settings on init
+  const initialData = await chrome.storage.local.get('settings');
+  if (initialData.settings) {
+    elements.settingSit.value = initialData.settings.sitMins;
+    elements.settingStand.value = initialData.settings.standMins;
+    elements.settingMove.value = initialData.settings.moveMins;
+  }
 
   async function updateUI() {
     const data = await chrome.storage.local.get(null);
@@ -77,14 +91,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const now = Date.now();
     const sessionElapsed = Math.floor((now - data.sessionStartTime) / 1000);
-    let sessionRemaining = (90 * 60) - sessionElapsed;
-    if (sessionRemaining < 0) sessionRemaining = 0;
+
+    const settings = data.settings || { sitMins: 20, standMins: 8, moveMins: 2, sessionCycles: 3 };
+    const totalSessionMins = settings.sessionCycles * (settings.sitMins + settings.standMins + settings.moveMins);
+    let macroRemaining = Math.max(0, (totalSessionMins * 60) - sessionElapsed);
 
     const postureElapsed = Math.floor((now - data.postureStartTime) / 1000);
     let postureRemaining = (data.postureDurationMins * 60) - postureElapsed;
     if (postureRemaining < 0) postureRemaining = 0;
 
-    elements.macroTime.innerText = formatTime(sessionRemaining);
+    elements.macroTime.innerText = formatTime(macroRemaining);
     elements.microTime.innerText = formatTime(postureRemaining);
     
     const states = {
@@ -129,15 +145,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   elements.startSessionBtn.addEventListener('click', async () => {
     const now = Date.now();
+    const data = await chrome.storage.local.get('settings');
+    const settings = data.settings || { sitMins: 20 };
+
     await chrome.storage.local.set({
       sessionActive: true,
       sessionStartTime: now,
       currentPosture: 'sitting',
       postureStartTime: now,
-      postureDurationMins: 20,
+      postureDurationMins: settings.sitMins,
       cycleCount: 0
     });
-    chrome.alarms.create('postureTransition', { delayInMinutes: 20 });
+    chrome.alarms.create('postureTransition', { delayInMinutes: settings.sitMins });
     updateUI();
   });
 
@@ -154,6 +173,32 @@ document.addEventListener('DOMContentLoaded', async () => {
       stats: { totalSessions: 0, totalSitMins: 0, totalStandMins: 0, totalMoveMins: 0 }
     });
     updateUI();
+  });
+
+  elements.settingsToggleBtn.addEventListener('click', () => {
+    elements.settingsView.classList.toggle('hidden');
+  });
+
+  elements.saveSettingsBtn.addEventListener('click', async () => {
+    const sitMins = parseFloat(elements.settingSit.value) || 20;
+    const standMins = parseFloat(elements.settingStand.value) || 8;
+    const moveMins = parseFloat(elements.settingMove.value) || 2;
+
+    await chrome.storage.local.set({
+      settings: {
+        sitMins,
+        standMins,
+        moveMins,
+        sessionCycles: 3
+      }
+    });
+    
+    const originalText = elements.saveSettingsBtn.innerText;
+    elements.saveSettingsBtn.innerText = "Saved!";
+    setTimeout(() => {
+      elements.saveSettingsBtn.innerText = originalText;
+      elements.settingsView.classList.add('hidden');
+    }, 1000);
   });
 
   // Initial load

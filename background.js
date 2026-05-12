@@ -1,7 +1,4 @@
-const SESSION_CYCLES = 3;
-const SIT_MINS = 20;
-const STAND_MINS = 8;
-const MOVE_MINS = 2;
+
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({
@@ -12,6 +9,7 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 async function notifyTab(message) {
+  console.log("Kinetics: Attempting to notify tab with message:", message);
   try {
     const tabs = await chrome.tabs.query({ active: true });
     let injected = false;
@@ -20,12 +18,13 @@ async function notifyTab(message) {
     for (const tab of tabs) {
       if (tab && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('about:')) {
         try {
+          console.log("Kinetics: Injecting into active tab:", tab.id);
           await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
           await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
           await chrome.tabs.sendMessage(tab.id, { action: "showNotification", message: message });
           injected = true;
         } catch (e) {
-          console.error("Injection failed for active tab", tab.id, e);
+          console.error("Kinetics: Injection failed for active tab", tab.id, e);
         }
       }
     }
@@ -36,6 +35,7 @@ async function notifyTab(message) {
       for (const tab of allTabs) {
         if (tab && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('about:')) {
           try {
+            console.log("Kinetics: Fallback to tab:", tab.id);
             await chrome.tabs.update(tab.id, { active: true });
             if (tab.windowId) {
               await chrome.windows.update(tab.windowId, { focused: true });
@@ -44,26 +44,29 @@ async function notifyTab(message) {
             await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
             await chrome.tabs.sendMessage(tab.id, { action: "showNotification", message: message });
             injected = true;
-            break; // Stop after successfully injecting into one fallback tab
+            break; 
           } catch (e) {
-            console.error("Fallback injection failed for tab", tab.id, e);
+            console.error("Kinetics: Fallback injection failed for tab", tab.id, e);
           }
         }
       }
     }
 
     if (!injected) {
-      console.warn("Kinetics: No valid tab found to display notification!");
+      console.warn("Kinetics: No valid tab found to display notification! Opening fallback page.");
+      chrome.tabs.create({ url: `fallback.html?msg=${encodeURIComponent(message)}` });
     }
   } catch (err) {
-    console.error("Failed to notify tab", err);
+    console.error("Kinetics: Critical failure in notifyTab", err);
   }
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'postureTransition') {
-    const data = await chrome.storage.local.get(['sessionActive', 'currentPosture', 'cycleCount', 'stats']);
+    const data = await chrome.storage.local.get(['sessionActive', 'currentPosture', 'cycleCount', 'stats', 'settings']);
     if (!data.sessionActive) return;
+
+    const settings = data.settings || { sitMins: 20, standMins: 8, moveMins: 2, sessionCycles: 3 };
 
     let nextPosture = '';
     let nextDuration = 0;
@@ -72,21 +75,21 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     let message = '';
 
     if (data.currentPosture === 'sitting') {
-      stats.totalSitMins += SIT_MINS;
+      stats.totalSitMins += settings.sitMins;
       nextPosture = 'standing';
-      nextDuration = STAND_MINS;
+      nextDuration = settings.standMins;
       message = "Time to Stand!";
     } else if (data.currentPosture === 'standing') {
-      stats.totalStandMins += STAND_MINS;
+      stats.totalStandMins += settings.standMins;
       nextPosture = 'moving';
-      nextDuration = MOVE_MINS;
+      nextDuration = settings.moveMins;
       message = "Time to Move!";
     } else if (data.currentPosture === 'moving') {
-      stats.totalMoveMins += MOVE_MINS;
+      stats.totalMoveMins += settings.moveMins;
       cycleCount++;
-      if (cycleCount < SESSION_CYCLES) {
+      if (cycleCount < settings.sessionCycles) {
         nextPosture = 'sitting';
-        nextDuration = SIT_MINS;
+        nextDuration = settings.sitMins;
         message = "Time to Sit!";
       } else {
         // Session complete
@@ -101,6 +104,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       }
     }
 
+    console.log(`Kinetics: Transitioning to ${nextPosture} for ${nextDuration} mins. Message: ${message}`);
+
     await chrome.storage.local.set({
       currentPosture: nextPosture,
       postureStartTime: Date.now(),
@@ -110,6 +115,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     });
 
     chrome.alarms.create('postureTransition', { delayInMinutes: nextDuration });
+    console.log("Kinetics: Alarm created, calling notifyTab...");
     await notifyTab(message);
   }
 });

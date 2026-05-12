@@ -32,12 +32,33 @@ body {
 h1 {
   font-size: 24px;
   font-weight: 800;
-  margin: 0 0 24px 0;
-  text-align: center;
+  margin: 0;
   background: linear-gradient(to right, #38bdf8, #818cf8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: 1px;
+}
+
+#header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+#settings-toggle-btn {
+  background: transparent;
+  width: auto;
+  padding: 8px;
+  font-size: 20px;
+  margin-bottom: 0;
+  box-shadow: none;
+}
+
+#settings-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: none;
+  box-shadow: none;
 }
 
 h2 {
@@ -164,6 +185,54 @@ button:focus-visible {
 #stats-view span {
   font-weight: 600;
   color: var(--text-main);
+}
+
+#settings-view {
+  background: var(--panel-bg);
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.setting-group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.setting-group label {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.setting-group input {
+  width: 70px;
+  background: #0f172a;
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 8px;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  text-align: center;
+}
+
+.setting-group input:focus {
+  outline: 2px solid var(--accent);
+}
+
+#save-settings-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+#save-settings-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
 }
 
 .footer {
